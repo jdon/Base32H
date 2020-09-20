@@ -9,69 +9,97 @@ const ENCODER_DIGITS: [u8; 32] = [
 ];
 
 static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
-    b'0' => b'0',
-    b'O' => b'0',
-    b'o' => b'0',
-    b'1' => b'1',
-    b'I' => b'1',
-    b'i' => b'1',
-    b'2' => b'2',
-    b'3' => b'3',
-    b'4' => b'4',
-    b'5' => b'5',
-    b'S' => b'5',
-    b's' => b'5',
-    b'6' => b'6',
-    b'7' => b'7',
-    b'8' => b'8',
-    b'9' => b'9',
-    b'a' => b'A',
-    b'A' => b'A',
-    b'b' => b'B',
-    b'B' => b'B',
-    b'C' => b'C',
-    b'c' => b'C',
-    b'D' => b'D',
-    b'd' => b'D',
-    b'E' => b'E',
-    b'e' => b'E',
-    b'F' => b'F',
-    b'f' => b'F',
-    b'G' => b'G',
-    b'g' => b'G',
-    b'H' => b'H',
-    b'h' => b'H',
-    b'J' => b'J',
-    b'j' => b'J',
-    b'K' => b'K',
-    b'k' => b'K',
-    b'L' => b'L',
-    b'l' => b'L',
-    b'M' => b'M',
-    b'm' => b'M',
-    b'N' => b'N',
-    b'n' => b'N',
-    b'P' => b'P',
-    b'p' => b'P',
-    b'Q' => b'Q',
-    b'q' => b'Q',
-    b'R' => b'R',
-    b'r' => b'R',
-    b'T' => b'T',
-    b't' => b'T',
-    b'V' => b'V',
-    b'v' => b'V',
-    b'U' => b'V',
-    b'u' => b'V',
-    b'W' => b'W',
-    b'w' => b'W',
-    b'X' => b'X',
-    b'x' => b'X',
-    b'Y' => b'Y',
-    b'y' => b'Y',
-    b'Z' => b'Z',
-    b'z' => b'Z'
+    b'0' => 0,
+    b'O'=> 0,
+    b'o'=> 0,
+    b'1'=> 1,
+    b'I'=> 1,
+    b'i'=> 1,
+    b'2'=> 2,
+    b'3'=> 3,
+    b'4'=> 4,
+    b'5'=> 5,
+    b'S'=> 5,
+    b's'=> 5,
+    b'6'=> 6,
+    b'7'=> 7,
+    b'8'=> 8,
+    b'9'=> 9,
+    b'a'=>10,
+    b'A'=>10,
+    b'b'=> 11,
+    b'B'=> 11,
+    b'C'=> 12,
+    b'c'=> 12,
+    b'D'=>13,
+    b'd'=>13,
+    b'E'=> 14,
+    b'e'=> 14,
+    b'F'=> 15,
+    b'f'=> 15,
+    b'G'=>16,
+    b'g'=>16,
+    b'H'=>17,
+    b'h'=>17,
+    b'J'=> 18,
+    b'j'=> 18,
+    b'K'=> 19,
+    b'k'=> 19,
+    b'L'=> 20,
+    b'l'=> 20,
+    b'M'=> 21,
+    b'm'=> 21,
+    b'N'=> 22,
+    b'n'=> 22,
+    b'P'=>23,
+    b'p'=>23,
+    b'Q'=>24,
+    b'q'=>24,
+    b'R'=> 25,
+    b'r'=> 25,
+    b'T'=> 26,
+    b't'=> 26,
+    b'V'=>27,
+    b'v'=>27,
+    b'U'=>27,
+    b'u'=>27,
+    b'W'=> 28,
+    b'w'=> 28,
+    b'X'=> 29,
+    b'x'=> 29,
+    b'Y'=>30,
+    b'y'=>30,
+    b'Z'=> 31,
+    b'z'=> 31,
 };
+
+// External functions
+
+pub fn encode_to_string(data: u128) -> Result<String, FromUtf8Error> {
+    return String::from_utf8(encode_bytes(data));
+}
+
+pub fn encode_binary_to_string(input: &[u8]) -> Result<String, FromUtf8Error> {
+    return String::from_utf8(encode_binary(input));
+}
+
+pub fn decode_string_to_binary(data: String) -> Vec<u8> {
+    let mut vdec = Vec::from(data);
+    let mut bytes: Vec<u8> = Vec::with_capacity(vdec.len());
+
+    pad(&mut vdec);
+
+    for chunk in vdec.chunks(8) {
+        let val = decode_bytes(Vec::from(chunk));
+        let result = unit40_to_bytes(val);
+        bytes.extend(result.iter());
+    }
+    return bytes;
+}
+
+pub fn decode_string(data: String) -> u128 {
+    return decode_bytes(Vec::from(data));
+}
 
 fn encode_digit(input: usize) -> u8 {
     return ENCODER_DIGITS[input];
@@ -81,16 +109,19 @@ fn decode_digit(input: u8) -> u8 {
     return DECODER_DIGITS[&input];
 }
 
-pub fn decode_bytes(mut input: Vec<u8>) -> u128 {
+// Takes in the output of encode_bytes
+fn decode_bytes(mut input: Vec<u8>) -> u128 {
     let mut acc = 0;
     let mut exp = 0;
     const THIRTY_TWO: u128 = 32;
     while input.len() > 0 {
         let to_decode = input.pop();
+        println!("{:?}", to_decode);
         match to_decode {
             Some(di) => {
                 let digit = decode_digit(di) as u128;
-                acc += digit * THIRTY_TWO.pow(exp);
+                println!("{:?}-{:?}", di, digit);
+                acc += digit * (THIRTY_TWO.pow(exp));
                 exp += 1;
             }
             None => {
@@ -115,7 +146,7 @@ fn encode_bytes(mut data: u128) -> Vec<u8> {
     return encoded_byte_array;
 }
 
-pub fn encode_binary(input: &[u8]) -> Vec<u8> {
+fn encode_binary(input: &[u8]) -> Vec<u8> {
     let padding_size = {
         let overflow = input.len() % 5;
         let mut return_vale = 0;
@@ -125,9 +156,7 @@ pub fn encode_binary(input: &[u8]) -> Vec<u8> {
         return_vale
     };
     let mut padded_input = vec![0; padding_size];
-    for is in input {
-        padded_input.push(*is);
-    }
+    padded_input.extend(input.iter());
     let mut result: Vec<u8> = Vec::with_capacity(10);
     for chunk in padded_input.chunks(5) {
         let uint40_byte = bytes_to_uint40(chunk);
@@ -138,23 +167,16 @@ pub fn encode_binary(input: &[u8]) -> Vec<u8> {
     return result;
 }
 
-pub fn encode_binary_to_string(input: &[u8]) -> Result<String, FromUtf8Error> {
-    return String::from_utf8(encode_binary(input));
-}
-
-pub fn encode_to_string(data: u128) -> Result<String, FromUtf8Error> {
-    return String::from_utf8(encode_bytes(data));
-}
-
-pub fn decode_string_to_bytes(data: String) -> 
-
 fn pad(input: &mut Vec<u8>) -> () {
-    const WIDTH: usize = 8;
-    let padding = input.len() % WIDTH;
+    return pad_custom(input, 8);
+}
+
+fn pad_custom(input: &mut Vec<u8>, width: usize) -> () {
+    let padding = input.len() % width;
     if padding == 0 {
         return;
     }
-    for _ in 0..(WIDTH - padding) {
+    for _ in 0..(width - padding) {
         input.insert(0, PADDING_CHAR);
     }
 }
@@ -168,9 +190,27 @@ fn bytes_to_uint40(data: &[u8]) -> u128 {
     return a + b + c + d + e;
 }
 
+fn unit40_to_bytes(input: u128) -> [u8; 5] {
+    let mut stdr = Vec::from(format!("{:x}", input).as_bytes());
+    pad_custom(&mut stdr, 10);
+    let sds = String::from_utf8_lossy(&stdr);
+    println!("STR: {:?}", sds);
+    let a = u8::from_str_radix(&sds[0..2], 16).unwrap();
+    let b = u8::from_str_radix(&sds[2..4], 16).unwrap();
+    let c = u8::from_str_radix(&sds[4..6], 16).unwrap();
+    let d = u8::from_str_radix(&sds[6..8], 16).unwrap();
+    let e = u8::from_str_radix(&sds[8..10], 16).unwrap();
+    println!("array: {:?}", [a, b, c, d, e]);
+
+    return [a, b, c, d, e];
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{bytes_to_uint40, encode_binary, encode_binary_to_string, encode_to_string};
+    use crate::{
+        bytes_to_uint40, decode_bytes, decode_string_to_binary, encode_binary_to_string,
+        encode_bytes, encode_to_string,
+    };
 
     #[test]
     fn encodes_large_spec_number() {
@@ -190,8 +230,25 @@ mod tests {
     }
 
     #[test]
-    fn decode_323() {
-        assert_eq!(decode_bytes([323]).unwrap(), "A3".to_owned());
+    fn decode_255() {
+        println!("{:?}", encode_bytes(323));
+        assert_eq!(decode_bytes(encode_bytes(323)), 323);
+        assert_eq!(decode_bytes(encode_bytes(451654668534)), 451654668534);
+        assert_eq!(decode_bytes(encode_bytes(5477847644)), 5477847644);
+        assert_eq!(decode_bytes(encode_bytes(48647684153165)), 48647684153165);
+    }
+
+    #[test]
+    fn decode_string() {
+        assert_eq!(
+            decode_string_to_binary(
+                encode_binary_to_string(&mut [
+                    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+                ])
+                .unwrap()
+            ),
+            vec![0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+        );
     }
 
     #[test]
