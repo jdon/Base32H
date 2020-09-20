@@ -1,4 +1,4 @@
-use phf::{phf_map, Set};
+use phf::phf_map;
 use std::string::FromUtf8Error;
 
 const PADDING_CHAR: u8 = b'0';
@@ -83,13 +83,13 @@ pub fn encode_binary_to_string(input: &[u8]) -> Result<String, FromUtf8Error> {
     return String::from_utf8(encode_binary(input));
 }
 
-pub fn decode_string_to_binary(data: String) -> Vec<u8> {
-    let mut vdec = Vec::from(data);
-    let mut bytes: Vec<u8> = Vec::with_capacity(vdec.len());
+pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
+    let mut string_bytes = Vec::from(data);
+    let mut bytes: Vec<u8> = Vec::with_capacity(string_bytes.len());
 
-    pad(&mut vdec);
+    pad(&mut string_bytes);
 
-    for chunk in vdec.chunks(8) {
+    for chunk in string_bytes.chunks(8) {
         let val = decode_bytes(Vec::from(chunk));
         let result = unit40_to_bytes(val);
         bytes.extend(result.iter());
@@ -97,7 +97,7 @@ pub fn decode_string_to_binary(data: String) -> Vec<u8> {
     return bytes;
 }
 
-pub fn decode_string(data: String) -> u128 {
+pub fn decode_string(data: &str) -> u128 {
     return decode_bytes(Vec::from(data));
 }
 
@@ -116,11 +116,9 @@ fn decode_bytes(mut input: Vec<u8>) -> u128 {
     const THIRTY_TWO: u128 = 32;
     while input.len() > 0 {
         let to_decode = input.pop();
-        println!("{:?}", to_decode);
         match to_decode {
             Some(di) => {
                 let digit = decode_digit(di) as u128;
-                println!("{:?}-{:?}", di, digit);
                 acc += digit * (THIRTY_TWO.pow(exp));
                 exp += 1;
             }
@@ -193,14 +191,13 @@ fn bytes_to_uint40(data: &[u8]) -> u128 {
 fn unit40_to_bytes(input: u128) -> [u8; 5] {
     let mut stdr = Vec::from(format!("{:x}", input).as_bytes());
     pad_custom(&mut stdr, 10);
+
     let sds = String::from_utf8_lossy(&stdr);
-    println!("STR: {:?}", sds);
     let a = u8::from_str_radix(&sds[0..2], 16).unwrap();
     let b = u8::from_str_radix(&sds[2..4], 16).unwrap();
     let c = u8::from_str_radix(&sds[4..6], 16).unwrap();
     let d = u8::from_str_radix(&sds[6..8], 16).unwrap();
     let e = u8::from_str_radix(&sds[8..10], 16).unwrap();
-    println!("array: {:?}", [a, b, c, d, e]);
 
     return [a, b, c, d, e];
 }
@@ -208,80 +205,123 @@ fn unit40_to_bytes(input: u128) -> [u8; 5] {
 #[cfg(test)]
 mod tests {
     use crate::{
-        bytes_to_uint40, decode_bytes, decode_string_to_binary, encode_binary_to_string,
-        encode_bytes, encode_to_string,
+        decode_string, decode_string_to_binary, encode_binary_to_string, encode_to_string,
     };
 
-    #[test]
-    fn encodes_large_spec_number() {
-        assert_eq!(
-            encode_to_string(1099511627775).unwrap(),
-            "ZZZZZZZZ".to_owned()
-        );
+    fn test_encode(input: u128, expected_output: String) -> () {
+        assert_eq!(encode_to_string(input).unwrap(), expected_output);
     }
-    #[test]
-    fn encodes_zero() {
-        assert_eq!(encode_to_string(0).unwrap(), "0".to_owned());
+
+    fn test_decode(input: &str, expected_output: u128) -> () {
+        assert_eq!(decode_string(input), expected_output);
     }
 
     #[test]
-    fn encodes_323() {
-        assert_eq!(encode_to_string(323).unwrap(), "A3".to_owned());
+    fn base32h_numeric_encode() {
+        for i in 0..10 {
+            test_encode(i, format!("{}", i));
+        }
+        let abc = [
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'T',
+            'V', 'W', 'X', 'Y', 'Z',
+        ];
+        for i in 0..22 {
+            let expected_output = abc.get(i).unwrap();
+            test_encode((i + 10) as u128, format!("{}", expected_output));
+        }
+
+        test_encode(31, "Z".to_owned());
+        test_encode(1023, "ZZ".to_owned());
+        test_encode(1048575, "ZZZZ".to_owned());
+        test_encode(1099511627775, "ZZZZZZZZ".to_owned());
+
+        test_encode(255, "7Z".to_owned());
+        test_encode(65535, "1ZZZ".to_owned());
+        test_encode(4294967295, "3ZZZZZZ".to_owned());
     }
 
     #[test]
-    fn decode_255() {
-        println!("{:?}", encode_bytes(323));
-        assert_eq!(decode_bytes(encode_bytes(323)), 323);
-        assert_eq!(decode_bytes(encode_bytes(451654668534)), 451654668534);
-        assert_eq!(decode_bytes(encode_bytes(5477847644)), 5477847644);
-        assert_eq!(decode_bytes(encode_bytes(48647684153165)), 48647684153165);
+    fn base32h_numeric_decode() {
+        //Canonical Digits
+        let digits = [
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G",
+            "H", "J", "K", "L", "M", "N", "P", "Q", "R", "T", "V", "W", "X", "Y", "Z",
+        ];
+        for i in 0..32 {
+            let input = digits.get(i).unwrap();
+            test_decode(input, i as u128);
+        }
+
+        //Alias Digits
+        test_decode("o", 0);
+        test_decode("O", 0);
+        test_decode("i", 1);
+        test_decode("I", 1);
+        test_decode("s", 5);
+        test_decode("S", 5);
+        test_decode("u", 27);
+        test_decode("U", 27);
+
+        let alias_digits = [
+            "a", "b", "c", "d", "e", "f", "g", "h", "j", "k", "l", "m", "n", "p", "q", "r", "t",
+            "v", "w", "x", "y", "z",
+        ];
+
+        for i in 0..22 {
+            test_decode(alias_digits[i], (i + 10) as u128);
+        }
+
+        // Numbers
+        test_decode("Z", 31);
+        test_decode("Zz", 1023);
+        test_decode("ZzzZ", 1048575);
+        test_decode("zZzZZzZz", 1099511627775);
+
+        test_decode("7z", 255);
+        test_decode("iZzZ", 65535);
+        test_decode("3zZzZzZ", 4294967295);
+    }
+
+    fn test_bin_encode(input: &[u8], expected_output: String) -> () {
+        assert_eq!(encode_binary_to_string(input).unwrap(), expected_output);
+    }
+    fn test_bin_decode(input: &str, expected_output: Vec<u8>) -> () {
+        assert_eq!(decode_string_to_binary(input), expected_output);
     }
 
     #[test]
-    fn decode_string() {
-        assert_eq!(
-            decode_string_to_binary(
-                encode_binary_to_string(&mut [
-                    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
-                ])
-                .unwrap()
-            ),
-            vec![0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+    fn base32h_binary_encode() {
+        test_bin_encode(&[255], "0000007Z".to_owned());
+        test_bin_encode(&[255, 255], "00001ZZZ".to_owned());
+        test_bin_encode(&[255, 255, 255], "000FZZZZ".to_owned());
+        test_bin_encode(&[255, 255, 255, 255], "03ZZZZZZ".to_owned());
+        test_bin_encode(&[255, 255, 255, 255, 255], "ZZZZZZZZ".to_owned());
+
+        test_bin_encode(
+            &[255, 255, 255, 255, 255, 255],
+            "0000007ZZZZZZZZZ".to_owned(),
+        );
+        test_bin_encode(
+            &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+            "ZZZZZZZZZZZZZZZZ".to_owned(),
         );
     }
 
     #[test]
-    fn it_encodes_binary() {
-        assert_eq!(
-            encode_binary_to_string(&mut [255]).unwrap(),
-            "0000007Z".to_owned()
+    fn base32h_binary_decode() {
+        test_bin_decode("7z", Vec::from([0, 0, 0, 0, 255]));
+        test_bin_decode("1zZz", Vec::from([0, 0, 0, 255, 255]));
+        test_bin_decode("fZzZz", Vec::from([0, 0, 255, 255, 255]));
+        test_bin_decode("3zZzZzZ", Vec::from([0, 255, 255, 255, 255]));
+        test_bin_decode("zZzZzZzZ", Vec::from([255, 255, 255, 255, 255]));
+
+        test_bin_decode(
+            "7ZZZZZZZZZ",
+            Vec::from([0, 0, 0, 0, 255, 255, 255, 255, 255, 255]),
         );
-        assert_eq!(
-            encode_binary_to_string(&mut [255, 255]).unwrap(),
-            "00001ZZZ".to_owned()
+        test_bin_decode(
+            "zZzZzZzZzZzZzZzZ",
+            Vec::from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255]),
         );
-        assert_eq!(
-            encode_binary_to_string(&mut [255, 255, 255]).unwrap(),
-            "000FZZZZ".to_owned()
-        );
-        assert_eq!(
-            encode_binary_to_string(&mut [255, 255, 255, 255]).unwrap(),
-            "03ZZZZZZ".to_owned()
-        );
-        assert_eq!(
-            encode_binary_to_string(&mut [255, 255, 255, 255, 255]).unwrap(),
-            "ZZZZZZZZ".to_owned()
-        );
-    }
-    #[test]
-    fn bytes_to_uint0() {
-        // assert_eq!(encode_binary_to_string(&[255]), "0000007Z".to_owned());
-        assert_eq!(bytes_to_uint40(&[255, 255, 255, 255, 255]), 1099511627775);
-    }
-    #[test]
-    fn en() {
-        // assert_eq!(encode_binary_to_string(&[255]), "0000007Z".to_owned());
-        assert_eq!(encode_to_string(1094911196858).unwrap(), "ZVNWMZMT");
     }
 }
