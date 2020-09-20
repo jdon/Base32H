@@ -8,6 +8,13 @@ const ENCODER_DIGITS: [u8; 32] = [
     b'G', b'H', b'J', b'K', b'L', b'M', b'N', b'P', b'Q', b'R', b'T', b'V', b'W', b'X', b'Y', b'Z',
 ];
 
+const VALID_DECODE_DIGIT: [char; 62] = [
+    '0', 'O', 'o', '1', 'I', 'i', '2', '3', '4', '5', 'S', 's', '6', '7', '8', '9', 'a', 'A', 'b',
+    'B', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f', 'G', 'g', 'H', 'h', 'J', 'j', 'K', 'k', 'L', 'l',
+    'M', 'm', 'N', 'n', 'P', 'p', 'Q', 'q', 'R', 'r', 'T', 't', 'V', 'v', 'U', 'u', 'W', 'w', 'X',
+    'x', 'Y', 'y', 'Z', 'z',
+];
+
 static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
     b'0' => 0,
     b'O'=> 0,
@@ -73,8 +80,6 @@ static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
     b'z'=> 31,
 };
 
-// External functions
-
 /// Returns a base32h encoded string representation of the inputted number
 ///
 /// # Arguments
@@ -120,7 +125,7 @@ pub fn encode_binary_to_string(data: &[u8]) -> Result<String, FromUtf8Error> {
 /// assert_eq!(decode_string_to_binary("zZzZzZzZ"), Vec::from([255, 255, 255, 255, 255]));
 /// ```
 pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
-    let mut string_bytes = Vec::from(data);
+    let mut string_bytes = filter_invalid(data);
     let mut bytes: Vec<u8> = Vec::with_capacity(string_bytes.len());
 
     pad(&mut string_bytes);
@@ -132,6 +137,7 @@ pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
     }
     return bytes;
 }
+
 /// Returns a u128 of a base32h encoded number
 ///
 /// # Arguments
@@ -145,7 +151,7 @@ pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
 /// assert_eq!(decode_string("3zZzZzZ"), 4294967295);
 /// ```
 pub fn decode_string(data: &str) -> u128 {
-    return decode_bytes(Vec::from(data));
+    return decode_bytes(filter_invalid(data));
 }
 
 fn encode_digit(input: usize) -> u8 {
@@ -156,7 +162,19 @@ fn decode_digit(input: u8) -> u8 {
     return DECODER_DIGITS[&input];
 }
 
-// Takes in the output of encode_bytes
+fn filter_invalid(input: &str) -> Vec<u8> {
+    input.chars().fold(Vec::new(), |mut acc, x| {
+        if is_decodeable(&x) {
+            acc.push(x as u8);
+        }
+        return acc;
+    })
+}
+
+fn is_decodeable(input: &char) -> bool {
+    VALID_DECODE_DIGIT.contains(input)
+}
+
 fn decode_bytes(mut input: Vec<u8>) -> u128 {
     let mut acc = 0;
     let mut exp = 0;
@@ -370,5 +388,15 @@ mod tests {
             "zZzZzZzZzZzZzZzZ",
             Vec::from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255]),
         );
+    }
+
+    #[test]
+    fn base32h_binary_decode_invalid() {
+        test_bin_decode("💩", Vec::from([]));
+    }
+
+    #[test]
+    fn base32h_decode_invalid() {
+        test_decode("💩", 0);
     }
 }
