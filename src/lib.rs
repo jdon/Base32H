@@ -75,14 +75,50 @@ static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
 
 // External functions
 
+/// Returns a base32h encoded string representation of the inputted number
+///
+/// # Arguments
+///
+/// * `data` - u128 data to encode
+///
+/// # Examples
+///
+/// ```
+/// use base32h::{encode_to_string};
+/// assert_eq!(encode_to_string(1099511627775).unwrap(), "ZZZZZZZZ".to_owned());
+/// ```
 pub fn encode_to_string(data: u128) -> Result<String, FromUtf8Error> {
     return String::from_utf8(encode_bytes(data));
 }
 
-pub fn encode_binary_to_string(input: &[u8]) -> Result<String, FromUtf8Error> {
-    return String::from_utf8(encode_binary(input));
+/// Returns a base32h encoded string representation of the inputted u8 slice
+///
+/// # Arguments
+///
+/// * `data` - u8 slice to encode
+///
+/// # Examples
+///
+/// ```
+/// use base32h::{encode_binary_to_string};
+/// assert_eq!(encode_binary_to_string(&[255, 255, 255, 255, 255, 255]).unwrap(), "0000007ZZZZZZZZZ".to_owned());
+/// ```
+pub fn encode_binary_to_string(data: &[u8]) -> Result<String, FromUtf8Error> {
+    return String::from_utf8(encode_binary(data));
 }
 
+/// Returns a vector from a base32h encoded string
+///
+/// # Arguments
+///
+/// * `data` - string slice to decode
+///
+/// # Examples
+///
+/// ```
+/// use base32h::{decode_string_to_binary};
+/// assert_eq!(decode_string_to_binary("zZzZzZzZ"), Vec::from([255, 255, 255, 255, 255]));
+/// ```
 pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
     let mut string_bytes = Vec::from(data);
     let mut bytes: Vec<u8> = Vec::with_capacity(string_bytes.len());
@@ -96,7 +132,18 @@ pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
     }
     return bytes;
 }
-
+/// Returns a u128 of a base32h encoded number
+///
+/// # Arguments
+///
+/// * `data` - string slice to decode
+///
+/// # Examples
+///
+/// ```
+/// use base32h::{decode_string};
+/// assert_eq!(decode_string("3zZzZzZ"), 4294967295);
+/// ```
 pub fn decode_string(data: &str) -> u128 {
     return decode_bytes(Vec::from(data));
 }
