@@ -6,10 +6,10 @@ fn encode(input: u128) -> String {
 }
 
 fn encode_bin(input: &[u8]) -> String {
-    encode_binary_to_string(input).unwrap()
+    encode_binary_to_string(input)
 }
 
-fn decode(input: &str) -> u128 {
+fn decode(input: &str) -> Option<u128> {
     decode_string(input)
 }
 

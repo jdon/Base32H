@@ -1,0 +1,44 @@
+
+[package]
+name = "base32h-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.3"
+
+[dependencies.base32h]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "encode_binary_to_string"
+path = "fuzz_targets/encode_binary_to_string.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "decode_string_to_binary"
+path = "fuzz_targets/decode_string_to_binary.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "encode_to_string"
+path = "fuzz_targets/encode_to_string.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "decode_string"
+path = "fuzz_targets/decode_string.rs"
+test = false
+doc = false

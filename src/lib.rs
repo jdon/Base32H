@@ -1,5 +1,4 @@
 use phf::phf_map;
-use std::string::FromUtf8Error;
 
 const PADDING_CHAR: u8 = b'0';
 
@@ -81,7 +80,7 @@ static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
 };
 
 /// Returns a base32h encoded string representation of the inputted number
-///
+/// Return None if input is greater than 9999999999999999999999999
 /// # Arguments
 ///
 /// * `data` - u128 data to encode
@@ -92,8 +91,11 @@ static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
 /// use base32h::{encode_to_string};
 /// assert_eq!(encode_to_string(1099511627775).unwrap(), "ZZZZZZZZ".to_owned());
 /// ```
-pub fn encode_to_string(data: u128) -> Result<String, FromUtf8Error> {
-    return String::from_utf8(encode_bytes(data));
+pub fn encode_to_string(data: u128) -> Option<String> {
+    if data > 9999999999999999999999999 {
+        return None;
+    }
+    Some(String::from_utf8(encode_bytes(data)).unwrap())
 }
 
 /// Returns a base32h encoded string representation of the inputted u8 slice
@@ -106,10 +108,10 @@ pub fn encode_to_string(data: u128) -> Result<String, FromUtf8Error> {
 ///
 /// ```
 /// use base32h::{encode_binary_to_string};
-/// assert_eq!(encode_binary_to_string(&[255, 255, 255, 255, 255, 255]).unwrap(), "0000007ZZZZZZZZZ".to_owned());
+/// assert_eq!(encode_binary_to_string(&[255, 255, 255, 255, 255, 255]), "0000007ZZZZZZZZZ".to_owned());
 /// ```
-pub fn encode_binary_to_string(data: &[u8]) -> Result<String, FromUtf8Error> {
-    return String::from_utf8(encode_binary(data));
+pub fn encode_binary_to_string(data: &[u8]) -> String {
+    return String::from_utf8(encode_binary(data)).unwrap();
 }
 
 /// Returns a vector from a base32h encoded string
@@ -138,7 +140,8 @@ pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
     return bytes;
 }
 
-/// Returns a u128 of a base32h encoded number
+/// Returns a Option<u128> of a base32h encoded number
+/// Return None if the length of the base32h string is greater than 25 bytes
 ///
 /// # Arguments
 ///
@@ -148,10 +151,14 @@ pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
 ///
 /// ```
 /// use base32h::{decode_string};
-/// assert_eq!(decode_string("3zZzZzZ"), 4294967295);
+/// assert_eq!(decode_string("3zZzZzZ"), Some(4294967295));
 /// ```
-pub fn decode_string(data: &str) -> u128 {
-    return decode_bytes(filter_invalid(data));
+pub fn decode_string(data: &str) -> Option<u128> {
+    let input_vec = filter_invalid(data);
+    if input_vec.len() > 25 {
+        return None;
+    }
+    return Some(decode_bytes(input_vec));
 }
 
 fn encode_digit(input: usize) -> u8 {
@@ -278,7 +285,7 @@ mod tests {
     }
 
     fn test_decode(input: &str, expected_output: u128) -> () {
-        assert_eq!(decode_string(input), expected_output);
+        assert_eq!(decode_string(input), Some(expected_output));
     }
 
     #[test]
@@ -303,6 +310,9 @@ mod tests {
         test_encode(255, "7Z".to_owned());
         test_encode(65535, "1ZZZ".to_owned());
         test_encode(4294967295, "3ZZZZZZ".to_owned());
+
+        //large u128
+        test_encode(9999999999999999999999999, "88NAHC501914ZZZZZ".to_owned());
     }
 
     #[test]
@@ -345,10 +355,12 @@ mod tests {
         test_decode("7z", 255);
         test_decode("iZzZ", 65535);
         test_decode("3zZzZzZ", 4294967295);
+
+        test_decode("88NAHC501914ZZZZZ", 9999999999999999999999999);
     }
 
     fn test_bin_encode(input: &[u8], expected_output: String) -> () {
-        assert_eq!(encode_binary_to_string(input).unwrap(), expected_output);
+        assert_eq!(encode_binary_to_string(input), expected_output);
     }
     fn test_bin_decode(input: &str, expected_output: Vec<u8>) -> () {
         assert_eq!(decode_string_to_binary(input), expected_output);
