@@ -18,6 +18,12 @@ assert_eq!(decode_string("ZZZZZZZZ"), Some(1099511627775));
 assert_eq!(encode_binary_to_string(&[255, 255, 255, 255, 255, 255]), "0000007ZZZZZZZZZ".to_owned());
 assert_eq!(decode_string_to_binary("zZzZzZzZ"), Vec::from([255, 255, 255, 255, 255]));
 ```
+
+### Test
+
+Run:
+`cargo test`
+
 ### Benchmarks
 
 Run:
