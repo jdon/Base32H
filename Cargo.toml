@@ -8,6 +8,7 @@ description = "Base32H for rust"
 repository = "https://github.com/jdon/Base32H/"
 readme = "README.md"
 documentation = "https://docs.rs/base32h"
+exclude = ["fuzz", ".github",]
 
 [dependencies]
 phf = { version = "0.8", features = ["macros"] }
