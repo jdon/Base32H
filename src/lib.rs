@@ -80,10 +80,10 @@ static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
 };
 
 /// Returns a base32h encoded string representation of the inputted number
-/// Return None if input is greater than 9999999999999999999999999
+/// Return None if input is greater than 1,099,511,627,775
 /// # Arguments
 ///
-/// * `data` - u128 data to encode
+/// * `data` - u64 data to encode
 ///
 /// # Examples
 ///
@@ -91,11 +91,11 @@ static DECODER_DIGITS: phf::Map<u8, u8> = phf_map! {
 /// use base32h::{encode_to_string};
 /// assert_eq!(encode_to_string(1099511627775).unwrap(), "ZZZZZZZZ".to_owned());
 /// ```
-pub fn encode_to_string(data: u128) -> Option<String> {
-    if data > 9999999999999999999999999 {
+pub fn encode_to_string(data: u64) -> Option<String> {
+    if data > 1099511627775 {
         return None;
     }
-    Some(String::from_utf8(encode_bytes(data)).unwrap())
+    Some(String::from_utf8(encode_bytes_allocation(data)).unwrap())
 }
 
 /// Returns a base32h encoded string representation of the inputted u8 slice
@@ -140,8 +140,8 @@ pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
     return bytes;
 }
 
-/// Returns a Option<u128> of a base32h encoded number
-/// Return None if the length of the base32h string is greater than 25 bytes
+/// Returns a Option<u64> of a base32h encoded number
+/// Return None if the length of the base32h string is greater than 8
 ///
 /// # Arguments
 ///
@@ -153,9 +153,9 @@ pub fn decode_string_to_binary(data: &str) -> Vec<u8> {
 /// use base32h::{decode_string};
 /// assert_eq!(decode_string("3zZzZzZ"), Some(4294967295));
 /// ```
-pub fn decode_string(data: &str) -> Option<u128> {
+pub fn decode_string(data: &str) -> Option<u64> {
     let input_vec = filter_invalid(data);
-    if input_vec.len() > 25 {
+    if input_vec.len() > 8 {
         return None;
     }
     return Some(decode_bytes(input_vec));
@@ -171,26 +171,26 @@ fn decode_digit(input: u8) -> u8 {
 
 fn filter_invalid(input: &str) -> Vec<u8> {
     input.chars().fold(Vec::new(), |mut acc, x| {
-        if is_decodeable(&x) {
+        if is_decodable(&x) {
             acc.push(x as u8);
         }
         return acc;
     })
 }
 
-fn is_decodeable(input: &char) -> bool {
+fn is_decodable(input: &char) -> bool {
     VALID_DECODE_DIGIT.contains(input)
 }
 
-fn decode_bytes(mut input: Vec<u8>) -> u128 {
+fn decode_bytes(mut input: Vec<u8>) -> u64 {
     let mut acc = 0;
     let mut exp = 0;
-    const THIRTY_TWO: u128 = 32;
+    const THIRTY_TWO: u64 = 32;
     while input.len() > 0 {
         let to_decode = input.pop();
         match to_decode {
             Some(di) => {
-                let digit = decode_digit(di) as u128;
+                let digit = decode_digit(di) as u64;
                 acc += digit * (THIRTY_TWO.pow(exp));
                 exp += 1;
             }
@@ -202,18 +202,33 @@ fn decode_bytes(mut input: Vec<u8>) -> u128 {
     return acc;
 }
 
-fn encode_bytes(mut data: u128) -> Vec<u8> {
+fn encode_bytes_allocation(mut data: u64) -> Vec<u8> {
     if data == 0 {
         return vec![PADDING_CHAR];
     }
-    let mut encoded_byte_array: Vec<u8> = Vec::with_capacity(5);
+
+    let mut empty_vec: Vec<u8> = Vec::with_capacity(5);
     while data > 0 {
         let b: usize = (data % 32) as usize;
-        encoded_byte_array.push(encode_digit(b).into());
+        empty_vec.push(encode_digit(b).into());
         data = data / 32;
     }
-    encoded_byte_array.reverse();
-    return encoded_byte_array;
+    empty_vec.reverse();
+    return empty_vec;
+}
+
+fn encode_bytes<'a>(mut data: u64, empty_vec: &'a mut Vec<u8>) -> &'a mut Vec<u8> {
+    if data == 0 {
+        empty_vec.push(PADDING_CHAR);
+        return empty_vec;
+    }
+    while data > 0 {
+        let b: usize = (data % 32) as usize;
+        empty_vec.push(encode_digit(b).into());
+        data = data / 32;
+    }
+    empty_vec.reverse();
+    return empty_vec;
 }
 
 fn encode_binary(input: &[u8]) -> Vec<u8> {
@@ -228,10 +243,11 @@ fn encode_binary(input: &[u8]) -> Vec<u8> {
     let mut padded_input = vec![0; padding_size];
     padded_input.extend(input.iter());
     let mut result: Vec<u8> = Vec::with_capacity(10);
+    let mut vec_to_use = Vec::with_capacity(5);
     for chunk in padded_input.chunks(5) {
         let uint40_byte = bytes_to_uint40(chunk);
-        let mut encoded_bytes = encode_bytes(uint40_byte);
-        result.append(&mut encoded_bytes);
+        let encoded_bytes = encode_bytes(uint40_byte, &mut vec_to_use);
+        result.append(encoded_bytes);
     }
     pad(&mut result);
     return result;
@@ -251,16 +267,16 @@ fn pad_custom(input: &mut Vec<u8>, width: usize) -> () {
     }
 }
 
-fn bytes_to_uint40(data: &[u8]) -> u128 {
-    let a = data[0] as u128 * 4294967296; // 2^32
-    let b = data[1] as u128 * 16777216; // 2^24
-    let c = data[2] as u128 * 65536; // 2^16
-    let d = data[3] as u128 * 256; // 2^8
-    let e = data[4] as u128;
+fn bytes_to_uint40(data: &[u8]) -> u64 {
+    let a = data[0] as u64 * 4294967296; // 2^32
+    let b = data[1] as u64 * 16777216; // 2^24
+    let c = data[2] as u64 * 65536; // 2^16
+    let d = data[3] as u64 * 256; // 2^8
+    let e = data[4] as u64;
     return a + b + c + d + e;
 }
 
-fn unit40_to_bytes(input: u128) -> [u8; 5] {
+fn unit40_to_bytes(input: u64) -> [u8; 5] {
     let mut stdr = Vec::from(format!("{:x}", input).as_bytes());
     pad_custom(&mut stdr, 10);
 
@@ -280,11 +296,11 @@ mod tests {
         decode_string, decode_string_to_binary, encode_binary_to_string, encode_to_string,
     };
 
-    fn test_encode(input: u128, expected_output: String) -> () {
+    fn test_encode(input: u64, expected_output: String) -> () {
         assert_eq!(encode_to_string(input).unwrap(), expected_output);
     }
 
-    fn test_decode(input: &str, expected_output: u128) -> () {
+    fn test_decode(input: &str, expected_output: u64) -> () {
         assert_eq!(decode_string(input), Some(expected_output));
     }
 
@@ -299,7 +315,7 @@ mod tests {
         ];
         for i in 0..22 {
             let expected_output = abc.get(i).unwrap();
-            test_encode((i + 10) as u128, format!("{}", expected_output));
+            test_encode((i + 10) as u64, format!("{}", expected_output));
         }
 
         test_encode(31, "Z".to_owned());
@@ -311,8 +327,7 @@ mod tests {
         test_encode(65535, "1ZZZ".to_owned());
         test_encode(4294967295, "3ZZZZZZ".to_owned());
 
-        //large u128
-        test_encode(9999999999999999999999999, "88NAHC501914ZZZZZ".to_owned());
+        test_encode(1099511627775, "ZZZZZZZZ".to_owned());
     }
 
     #[test]
@@ -324,7 +339,7 @@ mod tests {
         ];
         for i in 0..32 {
             let input = digits.get(i).unwrap();
-            test_decode(input, i as u128);
+            test_decode(input, i as u64);
         }
 
         //Alias Digits
@@ -343,7 +358,7 @@ mod tests {
         ];
 
         for i in 0..22 {
-            test_decode(alias_digits[i], (i + 10) as u128);
+            test_decode(alias_digits[i], (i + 10) as u64);
         }
 
         // Numbers
@@ -355,8 +370,7 @@ mod tests {
         test_decode("7z", 255);
         test_decode("iZzZ", 65535);
         test_decode("3zZzZzZ", 4294967295);
-
-        test_decode("88NAHC501914ZZZZZ", 9999999999999999999999999);
+        test_decode("ZZZZ-ZZZZ", 1099511627775);
     }
 
     fn test_bin_encode(input: &[u8], expected_output: String) -> () {

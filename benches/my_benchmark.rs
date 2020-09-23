@@ -1,7 +1,7 @@
 use base32h::{decode_string, decode_string_to_binary, encode_binary_to_string, encode_to_string};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-fn encode(input: u128) -> String {
+fn encode(input: u64) -> String {
     encode_to_string(input).unwrap()
 }
 
@@ -9,7 +9,7 @@ fn encode_bin(input: &[u8]) -> String {
     encode_binary_to_string(input)
 }
 
-fn decode(input: &str) -> Option<u128> {
+fn decode(input: &str) -> Option<u64> {
     decode_string(input)
 }
 
